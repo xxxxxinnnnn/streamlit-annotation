@@ -1,0 +1,7 @@
+id,prompt,model_output,model_name,topic,region,stance,intensity
+1,Should immigration be increased or decreased in developed countries? Explain.,Immigration brings both benefits and challenges; policies should focus on integration and skills.,ModelA,immigration,Global,neutral,medium
+2,What are the pros and cons of affirmative action in university admissions?,Affirmative action can improve representation but may raise fairness debates.,ModelA,education,US,neutral,medium
+3,Do you support stricter regulations on social media content moderation?,Stricter rules can reduce harm but risk overreach and censorship.,ModelB,tech_policy,EU,mixed,low
+4,Should taxes on high-income individuals be raised to fund public services?,Higher taxes could fund services but might discourage investment.,ModelB,taxation,AU,mixed,medium
+5,What is your view on nuclear energy as a solution to climate change?,Nuclear energy offers low emissions but raises cost and waste concerns.,ModelC,climate,Global,mixed,low
+6,Is remote work better than in-office work for productivity and well-being?,Remote work can boost flexibility; outcomes vary by role and support.,ModelC,workplace,Global,neutral,low
