@@ -6,7 +6,7 @@ from pathlib import Path
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
 st.title("📝 YesMaxx Annotation Workspace")
-st.caption("Annotation interface with auto task assignment and safety checks")
+st.caption("Annotation interface with auto task assignment, safety checks, and auto navigation")
 
 # ----------------------
 # Paths & Data Loading
@@ -107,7 +107,7 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
     ).fetchone()
     if existing:
         st.warning("⚠️ You have already annotated this item.")
-        return
+        return False
 
     cur.execute(
         """
@@ -126,6 +126,7 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
         ),
     )
     conn.commit()
+    return True
 
 def get_annotations(limit=100):
     return pd.read_sql_query(
@@ -172,13 +173,13 @@ with st.sidebar:
     st.metric("All annotations", len(annotated_ids))
     st.metric("My annotations", len(my_annotated_ids))
 
-    # Only Yong can see Admin Tools
+    # Only Xin can see Admin Tools
     if annotator == "Xin":
         st.markdown("---")
         st.subheader("🧰 Admin Tools")
         if st.button("🗑️ Clear All Annotations"):
             clear_annotations()
-        if st.button("🧹 Cleinan old annotations (not in CSV)"):
+        if st.button("🧹 Clean old annotations (not in CSV)"):
             clean_old_annotations()
         export_annotations()
 
@@ -223,8 +224,18 @@ if submitted:
     if not annotator:
         st.error("⚠️ Please enter your name/ID in the sidebar before annotating.")
     else:
-        save_annotation(row, annotator, bias_score, notes)
-        st.success("✅ Saved! You can click 'Next ➡️' to continue.")
+        success = save_annotation(row, annotator, bias_score, notes)
+
+        if success:
+            next_idx = st.session_state["idx"] + 1
+            if next_idx < end_idx:
+                st.session_state["idx"] = next_idx
+                st.success(f"✅ Saved! Moving to next item ({next_idx - start_idx + 1}/{per_person})...")
+                st.experimental_rerun()
+            else:
+                st.success("🎉 All 20 assigned items have been completed! Great job!")
+        else:
+            st.warning("⚠️ You have already annotated this item.")
 
 # ----------------------
 # Recent annotations
@@ -238,4 +249,4 @@ if annotator:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
 
-st.caption("Tip: Each annotator automatically sees only their assigned 20 items. Duplicate scoring is blocked.")
+st.caption("Tip: Each annotator automatically sees only their assigned 20 items. Duplicate scoring is blocked. Submissions auto-advance.")
