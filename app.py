@@ -22,7 +22,34 @@ if not DATA_PATH.exists():
     ])
     sample.to_csv(DATA_PATH, index=False)
 
-responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", sep=",", on_bad_lines="skip", quoting=3, engine="python")
+# Try reading CSV robustly
+try:
+    responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", sep=",", on_bad_lines="skip", engine="python")
+except Exception:
+    # fallback for space-separated files
+    responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", delim_whitespace=True, on_bad_lines="skip", engine="python")
+
+# fix column names
+responses_df.columns = [c.strip() for c in responses_df.columns]
+
+# auto-rename and merge if needed
+if set(responses_df.columns) != {"response_id", "run_id", "response_text"}:
+    # if the file has 3+ columns, merge extras into response_text
+    if len(responses_df.columns) >= 3:
+        responses_df.rename(columns={responses_df.columns[0]: "response_id",
+                                     responses_df.columns[1]: "run_id",
+                                     responses_df.columns[2]: "response_text"}, inplace=True)
+        # merge any extra columns into response_text
+        if len(responses_df.columns) > 3:
+            responses_df["response_text"] = responses_df.apply(
+                lambda x: " ".join([str(v) for v in x[2:].tolist() if pd.notnull(v)]),
+                axis=1
+            )
+            responses_df = responses_df[["response_id", "run_id", "response_text"]]
+    else:
+        st.error("Your CSV must contain at least 3 columns: response_id, run_id, response_text.")
+        st.stop()
+
 required_cols = {"response_id", "run_id", "response_text"}
 missing = required_cols - set(responses_df.columns)
 if missing:
@@ -153,4 +180,4 @@ if annotator:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
 
-st.caption("Tip: Replace responses.csv with your own file containing (response_id, run_id, response_text).")
+st.caption("Tip: CSV columns can be space- or comma-separated; app auto-fixes column alignment.")
