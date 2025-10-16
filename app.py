@@ -6,55 +6,40 @@ from pathlib import Path
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
 st.title("📝 YesMaxx Annotation Workspace")
-st.caption("Annotation UI for response_text dataset")
+st.caption("Annotation UI for full selector_decisions.csv dataset")
 
 # ----------------------
 # Paths & Data Loading
 # ----------------------
-DATA_PATH = Path("responses.csv")
+DATA_PATH = Path("selector_decisions.csv")  # 👈 自动读取完整文件
 DB_PATH = Path("annotations.db")
 
-# Load responses
+# Load data
 if not DATA_PATH.exists():
-    st.warning("responses.csv not found. Creating a sample file.")
-    sample = pd.DataFrame([
-        {"response_id": "rsp_sample_001", "run_id": "run_sample", "response_text": "This is a sample response text."}
-    ])
-    sample.to_csv(DATA_PATH, index=False)
+    st.error("❌ selector_decisions.csv not found. Please upload it to the same folder.")
+    st.stop()
 
-# Try reading CSV robustly
-try:
-    responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", sep=",", on_bad_lines="skip", engine="python")
-except Exception:
-    # fallback for space-separated files
-    responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", delim_whitespace=True, on_bad_lines="skip", engine="python")
-
-# fix column names
+# Read robustly
+responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
 responses_df.columns = [c.strip() for c in responses_df.columns]
 
-# auto-rename and merge if needed
-if set(responses_df.columns) != {"response_id", "run_id", "response_text"}:
-    # if the file has 3+ columns, merge extras into response_text
-    if len(responses_df.columns) >= 3:
-        responses_df.rename(columns={responses_df.columns[0]: "response_id",
-                                     responses_df.columns[1]: "run_id",
-                                     responses_df.columns[2]: "response_text"}, inplace=True)
-        # merge any extra columns into response_text
-        if len(responses_df.columns) > 3:
-            responses_df["response_text"] = responses_df.apply(
-                lambda x: " ".join([str(v) for v in x[2:].tolist() if pd.notnull(v)]),
-                axis=1
-            )
-            responses_df = responses_df[["response_id", "run_id", "response_text"]]
+# Validate basic structure
+if "response_id" not in responses_df.columns:
+    responses_df.insert(0, "response_id", range(1, len(responses_df) + 1))
+if "run_id" not in responses_df.columns:
+    responses_df.insert(1, "run_id", "run_001")
+if "response_text" not in responses_df.columns:
+    # try to auto-detect text-like column
+    text_col = None
+    for c in responses_df.columns:
+        if "text" in c.lower():
+            text_col = c
+            break
+    if text_col:
+        responses_df.rename(columns={text_col: "response_text"}, inplace=True)
     else:
-        st.error("Your CSV must contain at least 3 columns: response_id, run_id, response_text.")
+        st.error("⚠️ Could not find any column with text content.")
         st.stop()
-
-required_cols = {"response_id", "run_id", "response_text"}
-missing = required_cols - set(responses_df.columns)
-if missing:
-    st.error(f"responses.csv is missing required columns: {missing}")
-    st.stop()
 
 # ----------------------
 # Database Setup
@@ -96,7 +81,7 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
     ))
     conn.commit()
 
-def get_annotations(limit=50):
+def get_annotations(limit=100):
     return pd.read_sql_query(
         "SELECT response_id, run_id, annotator, bias_score, notes, timestamp FROM annotations ORDER BY timestamp DESC LIMIT ?",
         conn, params=(limit,)
@@ -148,36 +133,38 @@ with st.sidebar:
 # ----------------------
 idx = st.session_state["idx"]
 row = responses_df.iloc[idx]
-st.subheader(f"Response {idx+1}/{total}")
-st.markdown(f"**Response ID:** {row['response_id']}")
-st.markdown(f"**Run ID:** {row['run_id']}")
 
-st.markdown("#### Response Text")
-st.write(str(row["response_text"]))
+st.subheader(f"🗂️ Record {idx+1}/{total}")
+st.markdown("### Full Record Details")
+
+# ✅ 显示所有列的内容（每列单独一行）
+for col in responses_df.columns:
+    st.markdown(f"**{col}:** {row[col]}")
 
 st.markdown("---")
 st.markdown("### Annotate Now")
 with st.form("annotation_form", clear_on_submit=True):
-    bias_score = st.slider("Bias Score (1=No bias, 5=Strong bias)", 1, 5, 3)
+    bias_score = st.slider("Bias Score (1 = No bias, 5 = Strong bias)", 1, 5, 3)
     notes = st.text_area("Notes (optional)", "")
     submitted = st.form_submit_button("Submit ✅", use_container_width=True)
+
 if submitted:
     if not annotator:
-        st.error("Please enter your name/ID in the sidebar before annotating.")
+        st.error("⚠️ Please enter your name/ID in the sidebar before annotating.")
     else:
         save_annotation(row, annotator, bias_score, notes)
-        st.success("Saved! You can click 'Next' to continue.")
+        st.success("✅ Annotation saved! Click 'Next' to continue.")
 
 # ----------------------
 # Recent Annotations
 # ----------------------
 st.markdown("---")
 st.markdown("### Recent Annotations")
-ann_df = get_annotations(limit=100)
+ann_df = get_annotations(limit=200)
 if annotator:
     show_mine = st.checkbox("Show only my annotations", value=False)
     if show_mine:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
 
-st.caption("Tip: CSV columns can be space- or comma-separated; app auto-fixes column alignment.")
+st.caption("Tip: This app automatically displays all columns from selector_decisions.csv.")
