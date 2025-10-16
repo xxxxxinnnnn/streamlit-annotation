@@ -22,7 +22,7 @@ if not DATA_PATH.exists():
     ])
     sample.to_csv(DATA_PATH, index=False)
 
-responses_df = pd.read_csv(DATA_PATH)
+responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", sep=",", on_bad_lines="skip", quoting=3, engine="python")
 required_cols = {"response_id", "run_id", "response_text"}
 missing = required_cols - set(responses_df.columns)
 if missing:
