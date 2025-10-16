@@ -172,14 +172,15 @@ with st.sidebar:
     st.metric("All annotations", len(annotated_ids))
     st.metric("My annotations", len(my_annotated_ids))
 
-    # Admin utilities
-    st.markdown("---")
-    st.subheader("🧰 Admin Tools")
-    if st.button("🗑️ Clear All Annotations"):
-        clear_annotations()
-    if st.button("🧹 Clean old annotations (not in CSV)"):
-        clean_old_annotations()
-    export_annotations()
+    # Only Yong can see Admin Tools
+    if annotator == "Xin":
+        st.markdown("---")
+        st.subheader("🧰 Admin Tools")
+        if st.button("🗑️ Clear All Annotations"):
+            clear_annotations()
+        if st.button("🧹 Cleinan old annotations (not in CSV)"):
+            clean_old_annotations()
+        export_annotations()
 
     # Navigation
     st.markdown("---")
