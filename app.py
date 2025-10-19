@@ -100,7 +100,6 @@ def get_annotated_ids(annotator_filter=None):
     return {r[0] for r in rows}
 
 def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str):
-    # Prevent duplicate entries
     existing = cur.execute(
         "SELECT 1 FROM annotations WHERE response_id = ? AND annotator = ?",
         (str(row["response_id"]), annotator),
@@ -156,7 +155,10 @@ with st.sidebar:
     n_annotators = len(annotators)
     per_person = total // n_annotators
 
-    idx_person = annotators.index(annotator)
+    # 🔁 顺延一位的分配逻辑（rotate forward）
+    shifted_annotators = annotators[-1:] + annotators[:-1]  # ['Ammar', 'Xin', 'Yong', 'Mahir', 'Saqif']
+
+    idx_person = shifted_annotators.index(annotator)
     start_idx = idx_person * per_person
     end_idx = (idx_person + 1) * per_person
 
@@ -172,7 +174,7 @@ with st.sidebar:
     st.metric("All annotations", len(annotated_ids))
     st.metric("My annotations", len(my_annotated_ids))
 
-    # Only Yong can see Admin Tools
+    # 仅Xin可见管理员工具
     if annotator == "Xin":
         st.markdown("---")
         st.subheader("🧰 Admin Tools")
