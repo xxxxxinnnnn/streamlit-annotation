@@ -4,9 +4,9 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
-st.title("📝 YesMaxx Annotation Workspace")
-st.caption("Annotation interface with auto task assignment and safety checks")
+st.set_page_config(page_title="YesMaxx Annotation Workspace - Round 3", layout="wide")
+st.title("📝 YesMaxx Annotation Workspace (Round 3)")
+st.caption("Fully randomized third-round annotation with non-repeating assignment.")
 
 # ----------------------
 # Paths & Data Loading
@@ -14,7 +14,6 @@ st.caption("Annotation interface with auto task assignment and safety checks")
 DATA_PATH = Path("selector_decisions.csv")
 DB_PATH = Path("annotations.db")
 
-# Load CSV
 if not DATA_PATH.exists():
     st.error("❌ selector_decisions.csv not found in this directory.")
     st.stop()
@@ -22,11 +21,10 @@ if not DATA_PATH.exists():
 responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
 responses_df.columns = [c.strip() for c in responses_df.columns]
 
-# Ensure required columns
 if "response_id" not in responses_df.columns:
     responses_df.insert(0, "response_id", range(1, len(responses_df) + 1))
 if "run_id" not in responses_df.columns:
-    responses_df.insert(1, "run_id", "run_001")
+    responses_df.insert(1, "run_id", "run_003")
 if "response_text" not in responses_df.columns:
     text_col = None
     for c in responses_df.columns:
@@ -107,7 +105,6 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
     if existing:
         st.warning("⚠️ You have already annotated this item.")
         return
-
     cur.execute(
         """
         INSERT INTO annotations (
@@ -151,26 +148,24 @@ with st.sidebar:
         st.error("❌ Please enter a valid annotator name (Xin, Yong, Mahir, Saqif, Ammar).")
         st.stop()
 
-    total = len(responses_df)
-    n_annotators = len(annotators)
-    per_person = total // n_annotators
+    assignments_round3 = {
+        "Xin":   [6,15,24,33,42,51,60,69,78,87,2,26,38,47,53,66,72,85,90,98],
+        "Yong":  [3,8,17,29,36,43,52,61,70,79,1,25,34,46,55,63,74,82,91,97],
+        "Mahir": [5,12,18,22,30,44,50,62,73,80,4,28,39,49,57,67,76,83,88,94],
+        "Saqif": [7,11,19,23,35,40,54,64,75,84,9,16,27,31,45,58,65,77,86,99],
+        "Ammar": [10,13,14,20,21,32,37,41,48,56,59,68,71,81,89,92,93,95,96,100],
+    }
 
-    # 🔁 顺延一位的分配逻辑（rotate forward）
-    shifted_annotators = annotators[-1:] + annotators[:-1]  # ['Ammar', 'Xin', 'Yong', 'Mahir', 'Saqif']
-
-    idx_person = shifted_annotators.index(annotator)
-    start_idx = idx_person * per_person
-    end_idx = (idx_person + 1) * per_person
-
-    st.info(f"🧮 You are assigned items {start_idx+1}–{end_idx} (total {per_person}).")
+    assigned_ids = assignments_round3[annotator]
+    total_assigned = len(assigned_ids)
+    st.info(f"🧮 You are assigned {total_assigned} scattered items (non-contiguous).")
 
     if "idx" not in st.session_state:
-        st.session_state["idx"] = start_idx
+        st.session_state["idx"] = 0
 
     annotated_ids = get_annotated_ids()
     my_annotated_ids = get_annotated_ids(annotator_filter=annotator)
 
-    st.metric("Total samples", total)
     st.metric("All annotations", len(annotated_ids))
     st.metric("My annotations", len(my_annotated_ids))
 
@@ -190,25 +185,27 @@ with st.sidebar:
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("⬅️ Previous"):
-            st.session_state["idx"] = max(start_idx, st.session_state["idx"] - 1)
+            st.session_state["idx"] = max(0, st.session_state["idx"] - 1)
     with col2:
         if st.button("Next ➡️"):
-            st.session_state["idx"] = min(end_idx - 1, st.session_state["idx"] + 1)
+            st.session_state["idx"] = min(total_assigned - 1, st.session_state["idx"] + 1)
     with col3:
-        if st.button("Jump to Start"):
-            st.session_state["idx"] = start_idx
+        if st.button("🔄 Restart"):
+            st.session_state["idx"] = 0
 
 # ----------------------
 # Main display
 # ----------------------
 idx = st.session_state["idx"]
 
-if not (start_idx <= idx < end_idx):
-    st.warning("⚠️ You are outside your assigned task range. Please click 'Jump to Start'.")
+if idx >= total_assigned:
+    st.success("🎉 All your assigned items have been annotated!")
     st.stop()
 
-row = responses_df.iloc[idx]
-st.subheader(f"🗂️ Record {idx+1}/{total}")
+current_id = assigned_ids[idx] - 1
+row = responses_df.iloc[current_id]
+
+st.subheader(f"🗂️ Record {row['response_id']}  ({idx+1}/{total_assigned})")
 st.markdown("### Full Record Details")
 
 for col in responses_df.columns:
@@ -240,4 +237,4 @@ if annotator:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
 
-st.caption("Tip: Each annotator automatically sees only their assigned 20 items. Duplicate scoring is blocked.")
+st.caption("Tip: Round 3 uses scattered randomized assignment. Each annotator sees only their own 20 mixed samples.")
