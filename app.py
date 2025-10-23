@@ -156,7 +156,7 @@ with st.sidebar:
     "Ammar": [21,22,23,24,25,26,27,28,29,30,68,69,70,74,88,89,91,93,95,79],
 }
 
-    assigned_ids = assignments_round3[annotator]
+    assigned_ids = assignments_round4[annotator]
     total_assigned = len(assigned_ids)
     st.info(f"🧮 You are assigned {total_assigned} scattered items (non-contiguous).")
 
