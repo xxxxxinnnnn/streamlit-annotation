@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace - Round 4", layout="wide")
-st.title("📝 YesMaxx Annotation Workspace (Round 3)")
+st.title("📝 YesMaxx Annotation Workspace (Round 4)")
 st.caption("Fully randomized third-round annotation with non-repeating assignment.")
 
 # ----------------------
