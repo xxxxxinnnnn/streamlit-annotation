@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS annotations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     response_id TEXT,
     run_id TEXT,
-    response_text TEXT,
     annotator TEXT,
     bias_score INTEGER,
     notes TEXT,
