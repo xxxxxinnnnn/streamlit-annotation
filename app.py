@@ -107,13 +107,12 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
     cur.execute(
         """
         INSERT INTO annotations (
-            response_id, run_id, response_text, annotator, bias_score, notes, timestamp
+            response_id, run_id, annotator, bias_score, notes, timestamp
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             str(row["response_id"]),
             str(row["run_id"]),
-            str(row["response_text"]),
             annotator,
             int(bias_score),
             notes,
