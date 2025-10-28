@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace - Round 4", layout="wide")
-st.title("📝 YesMaxx Annotation Workspace (Round 4)")
+st.title("YesMaxx Annotation Workspace (Round 4)")
 st.caption("Fully randomized third-round annotation with non-repeating assignment.")
 
 # ----------------------
@@ -169,7 +169,6 @@ with st.sidebar:
     st.metric("All annotations", len(annotated_ids))
     st.metric("My annotations", len(my_annotated_ids))
 
-    # 仅Xin可见管理员工具
     if annotator == "Xin":
         st.markdown("---")
         st.subheader("🧰 Admin Tools")
@@ -193,9 +192,8 @@ with st.sidebar:
         if st.button("🔄 Restart"):
             st.session_state["idx"] = 0
 
-# ----------------------
 # Main display
-# ----------------------
+
 idx = st.session_state["idx"]
 
 if idx >= total_assigned:
@@ -225,9 +223,8 @@ if submitted:
         save_annotation(row, annotator, bias_score, notes)
         st.success("✅ Saved! You can click 'Next ➡️' to continue.")
 
-# ----------------------
 # Recent annotations
-# ----------------------
+
 st.markdown("---")
 st.markdown("### 🕒 Recent Annotations")
 ann_df = get_annotations(limit=200)
