@@ -201,7 +201,7 @@ if idx >= total_assigned:
 current_id = assigned_ids[idx] - 1
 row = responses_df.iloc[current_id]
 
-st.subheader(f"🗂️ Record {row['response_id']}  ({idx+1}/{total_assigned})")
+st.subheader(f"🗂️ Record ({idx+1}/{total_assigned})")
 st.markdown("### Full Record Details")
 
 if "prompt_text" in responses_df.columns:
