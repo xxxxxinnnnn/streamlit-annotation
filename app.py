@@ -204,8 +204,15 @@ row = responses_df.iloc[current_id]
 st.subheader(f"🗂️ Record {row['response_id']}  ({idx+1}/{total_assigned})")
 st.markdown("### Full Record Details")
 
-for col in responses_df.columns:
-    st.markdown(f"**{col}:** {row[col]}")
+if "prompt_text" in responses_df.columns:
+    st.markdown(f"**Prompt:** {row['prompt_text']}")
+else:
+    st.warning("⚠️ Column 'prompt_text' not found in CSV.")
+
+if "response_text" in responses_df.columns:
+    st.markdown(f"**Response:** {row['response_text']}")
+else:
+    st.warning("⚠️ Column 'response_text' not found in CSV.")
 
 st.markdown("---")
 st.markdown("### Annotate Now")
