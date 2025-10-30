@@ -6,7 +6,7 @@ from pathlib import Path
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
 st.title("YesMaxx Annotation Workspace")
-st.caption("Fully randomized third-round annotation with non-repeating assignment.")
+st.caption("Fully randomized annotation with non-repeating assignment.")
 
 # ----------------------
 # Paths & Data Loading
@@ -172,8 +172,6 @@ with st.sidebar:
         st.subheader("🧰 Admin Tools")
         if st.button("🗑️ Clear All Annotations"):
             clear_annotations()
-        if st.button("🧹 Clean old annotations (not in CSV)"):
-            clean_old_annotations()
         export_annotations()
 
     # Navigation
