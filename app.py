@@ -17,6 +17,9 @@ DB_PATH = Path("annotations.db")
 if not DATA_PATH.exists():
     st.error("❌ selector_decisions.csv not found in this directory.")
     st.stop()
+if os.path.exists(DB_PATH):
+    os.remove(DB_PATH)
+    print("✅ annotations.db deleted successfully.")
 
 responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
 responses_df.columns = [c.strip() for c in responses_df.columns]
