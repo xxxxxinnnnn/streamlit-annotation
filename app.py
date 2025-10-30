@@ -104,6 +104,7 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
     if existing:
         st.warning("⚠️ You have already annotated this item.")
         return
+    notes = str(notes).replace("'", "''").replace("\n", " ").strip()
     cur.execute(
         """
         INSERT INTO annotations (
@@ -147,12 +148,12 @@ with st.sidebar:
         st.stop()
 
     assignments_round4 = {
-    "Xin":   [72,96,92,87,97,67,99,90,94,98,64,100,71,80,76,84,79,82,75,77],
-    "Yong":  [65,73,41,66,78,83,81,43,46,48,85,50,56,44,49,51,52,54,55,60],
-    "Mahir": [31,32,33,34,35,36,37,38,39,40,42,45,47,53,57,58,59,61,62,63],
-    "Saqif": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
-    "Ammar": [21,22,23,24,25,26,27,28,29,30,68,69,70,74,88,89,91,93,95,79],
-}
+        "Xin":   [72,96,92,87,97,67,99,90,94,98,64,100,71,80,76,84,79,82,75,77],
+        "Yong":  [65,73,41,66,78,83,81,43,46,48,85,50,56,44,49,51,52,54,55,60],
+        "Mahir": [31,32,33,34,35,36,37,38,39,40,42,45,47,53,57,58,59,61,62,63],
+        "Saqif": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+        "Ammar": [21,22,23,24,25,26,27,28,29,30,68,69,70,74,88,89,91,93,95,79],
+    }
 
     assigned_ids = assignments_round4[annotator]
     total_assigned = len(assigned_ids)
@@ -164,8 +165,12 @@ with st.sidebar:
     annotated_ids = get_annotated_ids()
     my_annotated_ids = get_annotated_ids(annotator_filter=annotator)
 
-    st.metric("All annotations", len(annotated_ids))
-    st.metric("My annotations", len(my_annotated_ids))
+    # --- store in session for instant updates
+    st.session_state["annotations_count"] = len(annotated_ids)
+    st.session_state["my_annotations_count"] = len(my_annotated_ids)
+
+    st.metric("All annotations", st.session_state["annotations_count"])
+    st.metric("My annotations", st.session_state["my_annotations_count"])
 
     if annotator == "Xin":
         st.markdown("---")
@@ -188,8 +193,9 @@ with st.sidebar:
         if st.button("🔄 Restart"):
             st.session_state["idx"] = 0
 
+# ----------------------
 # Main display
-
+# ----------------------
 idx = st.session_state["idx"]
 
 if idx >= total_assigned:
@@ -226,8 +232,19 @@ if submitted:
         save_annotation(row, annotator, bias_score, notes)
         st.success("✅ Saved! You can click 'Next ➡️' to continue.")
 
-# Recent annotations
+        # --- instant counter updates (no rerun)
+        st.session_state["annotations_count"] += 1
+        st.session_state["my_annotations_count"] += 1
 
+        # --- visual confirmation
+        st.info(
+            f"📊 Updated Counts → All: {st.session_state['annotations_count']} | "
+            f"My: {st.session_state['my_annotations_count']}"
+        )
+
+# ----------------------
+# Recent annotations
+# ----------------------
 st.markdown("---")
 st.markdown("### 🕒 Recent Annotations")
 ann_df = get_annotations(limit=200)
