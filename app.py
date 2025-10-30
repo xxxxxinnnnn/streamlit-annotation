@@ -76,19 +76,6 @@ def export_annotations():
     )
 
 
-def clean_old_annotations():
-    df_csv = pd.read_csv("selector_decisions.csv", encoding="utf-8")
-    valid_ids = set(df_csv["response_id"].astype(str))
-    rows = cur.execute("SELECT DISTINCT response_id FROM annotations").fetchall()
-    old_ids = [r[0] for r in rows if r[0] not in valid_ids]
-    if old_ids:
-        cur.executemany("DELETE FROM annotations WHERE response_id = ?", [(oid,) for oid in old_ids])
-        conn.commit()
-        st.warning(f"🧹 Deleted {len(old_ids)} old annotations not in the current CSV.")
-    else:
-        st.info("✅ No outdated annotations found.")
-
-
 def get_annotated_ids(annotator_filter=None):
     if annotator_filter:
         rows = cur.execute(
@@ -108,6 +95,7 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
     if existing:
         st.warning("⚠️ You have already annotated this item.")
         return
+    notes = str(notes).replace("'", "''").replace("\n", " ").strip()
     cur.execute(
         """
         INSERT INTO annotations (
@@ -152,8 +140,8 @@ with st.sidebar:
         st.stop()
 
     assignments_round4 = {
-        "Xin": [72,96,92,87,97,67,99,90,94,98,64,100,71,80,76,84,79,82,75,77],
-        "Yong": [65,73,41,66,78,83,81,43,46,48,85,50,56,44,49,51,52,54,55,60],
+        "Xin":   [72,96,92,87,97,67,99,90,94,98,64,100,71,80,76,84,79,82,75,77],
+        "Yong":  [65,73,41,66,78,83,81,43,46,48,85,50,56,44,49,51,52,54,55,60],
         "Mahir": [31,32,33,34,35,36,37,38,39,40,42,45,47,53,57,58,59,61,62,63],
         "Saqif": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
         "Ammar": [21,22,23,24,25,26,27,28,29,30,68,69,70,74,88,89,91,93,95,79],
@@ -166,11 +154,18 @@ with st.sidebar:
     if "idx" not in st.session_state:
         st.session_state["idx"] = 0
 
-    annotated_ids = get_annotated_ids()
-    my_annotated_ids = get_annotated_ids(annotator_filter=annotator)
+    # --- 初始化计数
+    if "annotations_count" not in st.session_state:
+        st.session_state["annotations_count"] = len(get_annotated_ids())
+    if "my_annotations_count" not in st.session_state:
+        st.session_state["my_annotations_count"] = len(get_annotated_ids(annotator_filter=annotator))
 
-    st.metric("All annotations", len(annotated_ids))
-    st.metric("My annotations", len(my_annotated_ids))
+    # --- 容器形式，可动态更新
+    all_metric = st.empty()
+    my_metric = st.empty()
+
+    all_metric.metric("All annotations", st.session_state["annotations_count"])
+    my_metric.metric("My annotations", st.session_state["my_annotations_count"])
 
     if annotator == "Xin":
         st.markdown("---")
@@ -232,6 +227,21 @@ if submitted:
     else:
         save_annotation(row, annotator, bias_score, notes)
         st.success("✅ Saved! You can click 'Next ➡️' to continue.")
+
+        # --- 即时更新计数（不刷新页面）
+        st.session_state["annotations_count"] += 1
+        st.session_state["my_annotations_count"] += 1
+
+        # --- 实时刷新 sidebar 数字
+        with st.sidebar:
+            all_metric.metric("All annotations", st.session_state["annotations_count"])
+            my_metric.metric("My annotations", st.session_state["my_annotations_count"])
+
+        # --- 在主页面显示当前统计
+        st.info(
+            f"📊 Updated Counts → All: {st.session_state['annotations_count']} | "
+            f"My: {st.session_state['my_annotations_count']}"
+        )
 
 # ----------------------
 # Recent annotations
