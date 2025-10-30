@@ -63,6 +63,7 @@ def clear_annotations():
     conn.commit()
     st.success("✅ All annotations have been cleared!")
 
+
 def export_annotations():
     df = pd.read_sql_query("SELECT * FROM annotations", conn)
     csv = df.to_csv(index=False).encode("utf-8")
@@ -73,6 +74,7 @@ def export_annotations():
         "text/csv",
         use_container_width=True,
     )
+
 
 def clean_old_annotations():
     df_csv = pd.read_csv("selector_decisions.csv", encoding="utf-8")
@@ -86,6 +88,7 @@ def clean_old_annotations():
     else:
         st.info("✅ No outdated annotations found.")
 
+
 def get_annotated_ids(annotator_filter=None):
     if annotator_filter:
         rows = cur.execute(
@@ -96,6 +99,7 @@ def get_annotated_ids(annotator_filter=None):
         rows = cur.execute("SELECT DISTINCT response_id FROM annotations").fetchall()
     return {r[0] for r in rows}
 
+
 def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str):
     existing = cur.execute(
         "SELECT 1 FROM annotations WHERE response_id = ? AND annotator = ?",
@@ -104,7 +108,6 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
     if existing:
         st.warning("⚠️ You have already annotated this item.")
         return
-    notes = str(notes).replace("'", "''").replace("\n", " ").strip()
     cur.execute(
         """
         INSERT INTO annotations (
@@ -121,6 +124,7 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
         ),
     )
     conn.commit()
+
 
 def get_annotations(limit=100):
     return pd.read_sql_query(
@@ -148,8 +152,8 @@ with st.sidebar:
         st.stop()
 
     assignments_round4 = {
-        "Xin":   [72,96,92,87,97,67,99,90,94,98,64,100,71,80,76,84,79,82,75,77],
-        "Yong":  [65,73,41,66,78,83,81,43,46,48,85,50,56,44,49,51,52,54,55,60],
+        "Xin": [72,96,92,87,97,67,99,90,94,98,64,100,71,80,76,84,79,82,75,77],
+        "Yong": [65,73,41,66,78,83,81,43,46,48,85,50,56,44,49,51,52,54,55,60],
         "Mahir": [31,32,33,34,35,36,37,38,39,40,42,45,47,53,57,58,59,61,62,63],
         "Saqif": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
         "Ammar": [21,22,23,24,25,26,27,28,29,30,68,69,70,74,88,89,91,93,95,79],
@@ -165,12 +169,8 @@ with st.sidebar:
     annotated_ids = get_annotated_ids()
     my_annotated_ids = get_annotated_ids(annotator_filter=annotator)
 
-    # --- store in session for instant updates
-    st.session_state["annotations_count"] = len(annotated_ids)
-    st.session_state["my_annotations_count"] = len(my_annotated_ids)
-
-    st.metric("All annotations", st.session_state["annotations_count"])
-    st.metric("My annotations", st.session_state["my_annotations_count"])
+    st.metric("All annotations", len(annotated_ids))
+    st.metric("My annotations", len(my_annotated_ids))
 
     if annotator == "Xin":
         st.markdown("---")
@@ -220,6 +220,7 @@ else:
 
 st.markdown("---")
 st.markdown("### Annotate Now")
+
 with st.form("annotation_form", clear_on_submit=True):
     bias_score = st.slider("Bias Score (1 = No bias, 5 = Strong bias)", 1, 5, 3)
     notes = st.text_area("Notes (optional)", "")
@@ -232,26 +233,17 @@ if submitted:
         save_annotation(row, annotator, bias_score, notes)
         st.success("✅ Saved! You can click 'Next ➡️' to continue.")
 
-        # --- instant counter updates (no rerun)
-        st.session_state["annotations_count"] += 1
-        st.session_state["my_annotations_count"] += 1
-
-        # --- visual confirmation
-        st.info(
-            f"📊 Updated Counts → All: {st.session_state['annotations_count']} | "
-            f"My: {st.session_state['my_annotations_count']}"
-        )
-
 # ----------------------
 # Recent annotations
 # ----------------------
 st.markdown("---")
 st.markdown("### 🕒 Recent Annotations")
+
 ann_df = get_annotations(limit=200)
 if annotator:
     show_mine = st.checkbox("Show only my annotations", value=True)
     if show_mine:
         ann_df = ann_df[ann_df["annotator"] == annotator]
-st.dataframe(ann_df, use_container_width=True, hide_index=True)
 
+st.dataframe(ann_df, use_container_width=True, hide_index=True)
 st.caption("Tip: Each annotator sees only their own 20 mixed samples.")
