@@ -237,4 +237,4 @@ if annotator:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
 
-st.caption("Tip: Round 4 uses scattered randomized assignment. Each annotator sees only their own 20 mixed samples.")
+st.caption("Tip: Each annotator sees only their own 20 mixed samples.")
