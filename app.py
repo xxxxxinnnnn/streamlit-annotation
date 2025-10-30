@@ -225,6 +225,7 @@ if submitted:
     else:
         save_annotation(row, annotator, bias_score, notes)
         st.success("✅ Saved! You can click 'Next ➡️' to continue.")
+        st.rerun()
 
 # Recent annotations
 
