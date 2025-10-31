@@ -21,11 +21,9 @@ if not DATA_PATH.exists():
 responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
 responses_df.columns = [c.strip() for c in responses_df.columns]
 
-# 确保 response_id 存在
 if "response_id" not in responses_df.columns:
     responses_df.insert(0, "response_id", range(1, len(responses_df) + 1))
 
-# 保留原始 run_id，如果没有就加默认值
 run_col = None
 for c in responses_df.columns:
     if "run_id" in c.lower():
@@ -36,7 +34,6 @@ if run_col and run_col != "run_id":
 elif not run_col:
     responses_df.insert(1, "run_id", "run_003")
 
-# 确保 response_text 存在
 if "response_text" not in responses_df.columns:
     text_col = None
     for c in responses_df.columns:
@@ -109,13 +106,13 @@ def get_annotated_ids(annotator_filter=None):
     return {r[0] for r in rows}
 
 def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str) -> bool:
-    """保存单条标注。如果重复返回 False，否则 True"""
+
     existing = cur.execute(
         "SELECT 1 FROM annotations WHERE response_id = ? AND annotator = ?",
         (str(row["response_id"]), annotator),
     ).fetchone()
     if existing:
-        return False  # 重复标注
+        return False
 
     cur.execute(
         """
