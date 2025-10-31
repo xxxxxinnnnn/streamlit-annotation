@@ -232,7 +232,7 @@ if submitted:
     else:
         save_annotation(row, annotator, bias_score, notes)
         st.session_state["idx"] = min(total_assigned - 1, st.session_state["idx"] + 1)
-        st.experimental_rerun()
+        st.rerun()
 
 # ----------------------
 # Recent annotations
