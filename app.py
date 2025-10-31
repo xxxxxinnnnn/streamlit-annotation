@@ -231,7 +231,8 @@ if submitted:
         st.error("⚠️ Please enter your name/ID in the sidebar before annotating.")
     else:
         save_annotation(row, annotator, bias_score, notes)
-        st.success("✅ Saved! You can click 'Next ➡️' to continue.")
+        st.session_state["idx"] = min(total_assigned - 1, st.session_state["idx"] + 1)
+        st.experimental_rerun()
 
 # ----------------------
 # Recent annotations
