@@ -21,10 +21,22 @@ if not DATA_PATH.exists():
 responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
 responses_df.columns = [c.strip() for c in responses_df.columns]
 
+# 确保 response_id 存在
 if "response_id" not in responses_df.columns:
     responses_df.insert(0, "response_id", range(1, len(responses_df) + 1))
-if "run_id" not in responses_df.columns:
+
+# 保留原始 run_id，如果没有就加默认值
+run_col = None
+for c in responses_df.columns:
+    if "run_id" in c.lower():
+        run_col = c
+        break
+if run_col and run_col != "run_id":
+    responses_df.rename(columns={run_col: "run_id"}, inplace=True)
+elif not run_col:
     responses_df.insert(1, "run_id", "run_003")
+
+# 确保 response_text 存在
 if "response_text" not in responses_df.columns:
     text_col = None
     for c in responses_df.columns:
@@ -63,7 +75,6 @@ def clear_annotations():
     conn.commit()
     st.success("✅ All annotations have been cleared!")
 
-
 def export_annotations():
     df = pd.read_sql_query("SELECT * FROM annotations", conn)
     csv = df.to_csv(index=False).encode("utf-8")
@@ -74,7 +85,6 @@ def export_annotations():
         "text/csv",
         use_container_width=True,
     )
-
 
 def clean_old_annotations():
     df_csv = pd.read_csv("selector_decisions.csv", encoding="utf-8")
@@ -88,7 +98,6 @@ def clean_old_annotations():
     else:
         st.info("✅ No outdated annotations found.")
 
-
 def get_annotated_ids(annotator_filter=None):
     if annotator_filter:
         rows = cur.execute(
@@ -99,15 +108,15 @@ def get_annotated_ids(annotator_filter=None):
         rows = cur.execute("SELECT DISTINCT response_id FROM annotations").fetchall()
     return {r[0] for r in rows}
 
-
-def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str):
+def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str) -> bool:
+    """保存单条标注。如果重复返回 False，否则 True"""
     existing = cur.execute(
         "SELECT 1 FROM annotations WHERE response_id = ? AND annotator = ?",
         (str(row["response_id"]), annotator),
     ).fetchone()
     if existing:
-        st.warning("⚠️ You have already annotated this item.")
-        return
+        return False  # 重复标注
+
     cur.execute(
         """
         INSERT INTO annotations (
@@ -124,7 +133,7 @@ def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str)
         ),
     )
     conn.commit()
-
+    return True
 
 def get_annotations(limit=100):
     return pd.read_sql_query(
@@ -146,17 +155,16 @@ with st.sidebar:
     st.session_state["annotator"] = annotator
 
     annotators = ["Xin", "Yong", "Mahir", "Saqif", "Ammar"]
-
     if annotator not in annotators:
         st.error("❌ Please enter a valid annotator name (Xin, Yong, Mahir, Saqif, Ammar).")
         st.stop()
 
     assignments_round4 = {
-        "Xin": [72,96,92,87,97,67,99,90,94,98,64,100,71,80,76,84,100,82,75,77],
-        "Yong": [65,73,41,66,78,83,81,43,46,48,85,50,56,44,49,51,52,54,55,60],
-        "Mahir": [31,32,33,34,35,36,37,38,39,40,42,45,47,53,57,58,59,61,62,63],
+        "Xin": [81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100],
+        "Yong": [61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80],
+        "Mahir": [41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60],
         "Saqif": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
-        "Ammar": [21,22,23,24,25,26,27,28,29,30,68,69,70,74,88,89,91,93,95,79],
+        "Ammar": [21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
     }
 
     assigned_ids = assignments_round4[annotator]
@@ -210,6 +218,8 @@ st.markdown("### Full Record Details")
 
 if "prompt_text_x" in responses_df.columns:
     st.markdown(f"**Prompt:** {row['prompt_text_x']}")
+elif "prompt_text" in responses_df.columns:
+    st.markdown(f"**Prompt:** {row['prompt_text']}")
 else:
     st.warning("⚠️ Column 'prompt_text' not found in CSV.")
 
@@ -221,6 +231,9 @@ else:
 st.markdown("---")
 st.markdown("### Annotate Now")
 
+# ----------------------
+# Form submission
+# ----------------------
 with st.form("annotation_form", clear_on_submit=True):
     bias_score = st.slider("Bias Score (1 = No bias, 5 = Strong bias)", 1, 5, 3)
     notes = st.text_area("Notes (optional)", "")
@@ -230,9 +243,13 @@ if submitted:
     if not annotator:
         st.error("⚠️ Please enter your name/ID in the sidebar before annotating.")
     else:
-        save_annotation(row, annotator, bias_score, notes)
-        st.session_state["idx"] = min(total_assigned - 1, st.session_state["idx"] + 1)
-        st.rerun()
+        inserted = save_annotation(row, annotator, bias_score, notes)
+        if not inserted:
+            st.warning("⚠️ You have already annotated this record.\n\n👉 Please click **Next ➡️** to continue.")
+        else:
+            st.success("✅ Saved and moved to next record!")
+            st.session_state["idx"] = min(total_assigned - 1, st.session_state["idx"] + 1)
+            st.rerun()
 
 # ----------------------
 # Recent annotations
