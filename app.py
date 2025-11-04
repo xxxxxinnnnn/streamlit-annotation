@@ -3,21 +3,34 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+import random
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
-st.title("YesMaxx Annotation Workspace")
-st.caption("Fully randomized annotation with non-repeating assignment.")
+st.title("📝 YesMaxx Annotation Workspace (Auto Assignment)")
+st.caption("Automatically assigns 20 random records per annotator whenever a new CSV is uploaded.")
 
 # ----------------------
-# Paths & Data Loading
+# File Upload or Path
 # ----------------------
-DATA_PATH = Path("selector_decisions_main2_3.csv")
+st.sidebar.header("📂 Upload Dataset")
+uploaded_file = st.sidebar.file_uploader("Upload a selector_decisions CSV file", type=["csv"])
+
+if uploaded_file is not None:
+    DATA_PATH = Path("uploaded_data.csv")
+    with open(DATA_PATH, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+else:
+    DATA_PATH = Path("selector_decisions.csv")
+
 DB_PATH = Path("annotations.db")
 
 if not DATA_PATH.exists():
-    st.error("❌ selector_decisions.csv not found in this directory.")
+    st.error("❌ No CSV file found. Please upload one.")
     st.stop()
 
+# ----------------------
+# Load CSV
+# ----------------------
 responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
 responses_df.columns = [c.strip() for c in responses_df.columns]
 
@@ -32,7 +45,7 @@ for c in responses_df.columns:
 if run_col and run_col != "run_id":
     responses_df.rename(columns={run_col: "run_id"}, inplace=True)
 elif not run_col:
-    responses_df.insert(1, "run_id", "run_003")
+    responses_df.insert(1, "run_id", "run_auto")
 
 if "response_text" not in responses_df.columns:
     text_col = None
@@ -83,18 +96,6 @@ def export_annotations():
         use_container_width=True,
     )
 
-def clean_old_annotations():
-    df_csv = pd.read_csv("selector_decisions.csv", encoding="utf-8")
-    valid_ids = set(df_csv["response_id"].astype(str))
-    rows = cur.execute("SELECT DISTINCT response_id FROM annotations").fetchall()
-    old_ids = [r[0] for r in rows if r[0] not in valid_ids]
-    if old_ids:
-        cur.executemany("DELETE FROM annotations WHERE response_id = ?", [(oid,) for oid in old_ids])
-        conn.commit()
-        st.warning(f"🧹 Deleted {len(old_ids)} old annotations not in the current CSV.")
-    else:
-        st.info("✅ No outdated annotations found.")
-
 def get_annotated_ids(annotator_filter=None):
     if annotator_filter:
         rows = cur.execute(
@@ -106,7 +107,6 @@ def get_annotated_ids(annotator_filter=None):
     return {r[0] for r in rows}
 
 def save_annotation(row: pd.Series, annotator: str, bias_score: int, notes: str) -> bool:
-
     existing = cur.execute(
         "SELECT 1 FROM annotations WHERE response_id = ? AND annotator = ?",
         (str(row["response_id"]), annotator),
@@ -156,17 +156,29 @@ with st.sidebar:
         st.error("❌ Please enter a valid annotator name (Xin, Yong, Mahir, Saqif, Ammar).")
         st.stop()
 
-    assignments_round4 = {
-        "Xin": [81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100],
-        "Yong": [61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80],
-        "Mahir": [41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60],
-        "Saqif": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
-        "Ammar": [21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
-    }
+    # ----------------------
+    # ✅ Auto-random assignment
+    # ----------------------
+    total = len(responses_df)
+    n_annotators = len(annotators)
+    per_person = total // n_annotators
 
-    assigned_ids = assignments_round4[annotator]
+    all_ids = list(range(1, total + 1))
+    random.shuffle(all_ids)
+
+    assignments_auto = {}
+    start = 0
+    for i, name in enumerate(annotators):
+        end = start + per_person
+        if i == n_annotators - 1:
+            assignments_auto[name] = all_ids[start:]
+        else:
+            assignments_auto[name] = all_ids[start:end]
+        start = end
+
+    assigned_ids = assignments_auto[annotator]
     total_assigned = len(assigned_ids)
-    st.info(f"🧮 You are assigned {total_assigned} scattered items (non-contiguous).")
+    st.info(f"🧮 Auto-assigned {total_assigned} random items to {annotator} (total {total}).")
 
     if "idx" not in st.session_state:
         st.session_state["idx"] = 0
@@ -261,4 +273,4 @@ if annotator:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
-st.caption("Tip: Each annotator sees only their own 20 mixed samples.")
+st.caption("Tip: Each annotator automatically receives 20 random items per dataset upload.")
