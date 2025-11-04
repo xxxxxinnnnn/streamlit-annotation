@@ -4,10 +4,11 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 import random
+import hashlib
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
 st.title("YesMaxx Annotation Workspace")
-st.caption("Fully randomized annotation with non-repeating assignment.")
+st.caption("Fully randomized annotation with persistent 20-item assignment per annotator until new CSV is loaded.")
 
 # ----------------------
 # Paths & Data Loading
@@ -16,7 +17,7 @@ DATA_PATH = Path("selector_decisions_main2_3.csv")
 DB_PATH = Path("annotations.db")
 
 if not DATA_PATH.exists():
-    st.error("❌ selector_decisions.csv not found in this directory.")
+    st.error("❌ selector_decisions_main2_3.csv not found in this directory.")
     st.stop()
 
 responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
@@ -84,18 +85,6 @@ def export_annotations():
         use_container_width=True,
     )
 
-def clean_old_annotations():
-    df_csv = pd.read_csv("selector_decisions.csv", encoding="utf-8")
-    valid_ids = set(df_csv["response_id"].astype(str))
-    rows = cur.execute("SELECT DISTINCT response_id FROM annotations").fetchall()
-    old_ids = [r[0] for r in rows if r[0] not in valid_ids]
-    if old_ids:
-        cur.executemany("DELETE FROM annotations WHERE response_id = ?", [(oid,) for oid in old_ids])
-        conn.commit()
-        st.warning(f"🧹 Deleted {len(old_ids)} old annotations not in the current CSV.")
-    else:
-        st.info("✅ No outdated annotations found.")
-
 def get_annotated_ids(annotator_filter=None):
     if annotator_filter:
         rows = cur.execute(
@@ -157,22 +146,31 @@ with st.sidebar:
         st.stop()
 
     # ----------------------
-    # ✅ 自动随机分配逻辑（每人 20 条）
+    # ✅ 自动分配 + 持久化逻辑
     # ----------------------
     total = len(responses_df)
     all_ids = list(range(1, total + 1))
-    random.shuffle(all_ids)
+    per_person = 20
 
-    assignments_round4 = {}
-    start = 0
-    for name in annotators:
-        end = start + 20
-        assignments_round4[name] = all_ids[start:end]
-        start = end
+    # 根据文件名+大小生成唯一签名（判断是否新CSV）
+    file_signature = hashlib.md5(f"{DATA_PATH.name}_{DATA_PATH.stat().st_size}".encode()).hexdigest()
 
-    assigned_ids = assignments_round4[annotator]
+    if "assignments" not in st.session_state or st.session_state.get("file_signature") != file_signature:
+        # 新CSV → 重新分配
+        random.shuffle(all_ids)
+        assignments = {}
+        start = 0
+        for name in annotators:
+            end = start + per_person
+            assignments[name] = all_ids[start:end]
+            start = end
+        st.session_state["assignments"] = assignments
+        st.session_state["file_signature"] = file_signature
+
+    # 使用已有分配（不再重洗）
+    assigned_ids = st.session_state["assignments"][annotator]
     total_assigned = len(assigned_ids)
-    st.info(f"🧮 You are assigned {total_assigned} random items (non-contiguous).")
+    st.info(f"🧮 You are assigned {total_assigned} fixed items (persisted until a new CSV is loaded).")
 
     if "idx" not in st.session_state:
         st.session_state["idx"] = 0
@@ -267,4 +265,4 @@ if annotator:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
-st.caption("Tip: Each annotator automatically gets 20 random samples per round.")
+st.caption("Tip: Each annotator's 20 items stay fixed until a new CSV file is loaded.")
