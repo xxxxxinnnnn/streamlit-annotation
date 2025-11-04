@@ -10,9 +10,9 @@ st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
 st.title("YesMaxx Annotation Workspace")
 st.caption("Fully randomized annotation with persistent 20-item assignment per annotator until new CSV is loaded.")
 
-# ----------------------
+
 # Paths & Data Loading
-# ----------------------
+
 DATA_PATH = Path("selector_decisions_main2_3.csv")
 DB_PATH = Path("annotations.db")
 
@@ -48,9 +48,9 @@ if "response_text" not in responses_df.columns:
         st.error("⚠️ Could not find a column containing text content.")
         st.stop()
 
-# ----------------------
+
 # Database Setup
-# ----------------------
+
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cur = conn.cursor()
 cur.execute("""
@@ -66,9 +66,9 @@ CREATE TABLE IF NOT EXISTS annotations (
 """)
 conn.commit()
 
-# ----------------------
+
 # Utility functions
-# ----------------------
+
 def clear_annotations():
     cur.execute("DELETE FROM annotations;")
     conn.commit()
@@ -128,9 +128,9 @@ def get_annotations(limit=100):
         params=(limit,),
     )
 
-# ----------------------
+
 # Sidebar controls
-# ----------------------
+
 with st.sidebar:
     st.header("🔧 Controls")
 
@@ -145,18 +145,16 @@ with st.sidebar:
         st.error("❌ Please enter a valid annotator name (Xin, Yong, Mahir, Saqif, Ammar).")
         st.stop()
 
-    # ----------------------
-    # ✅ 自动分配 + 持久化逻辑
-    # ----------------------
+    # automatic allocation
+    
     total = len(responses_df)
     all_ids = list(range(1, total + 1))
     per_person = 20
 
-    # 根据文件名+大小生成唯一签名（判断是否新CSV）
     file_signature = hashlib.md5(f"{DATA_PATH.name}_{DATA_PATH.stat().st_size}".encode()).hexdigest()
 
     if "assignments" not in st.session_state or st.session_state.get("file_signature") != file_signature:
-        # 新CSV → 重新分配
+
         random.shuffle(all_ids)
         assignments = {}
         start = 0
@@ -167,7 +165,7 @@ with st.sidebar:
         st.session_state["assignments"] = assignments
         st.session_state["file_signature"] = file_signature
 
-    # 使用已有分配（不再重洗）
+
     assigned_ids = st.session_state["assignments"][annotator]
     total_assigned = len(assigned_ids)
     st.info(f"🧮 You are assigned {total_assigned} fixed items (persisted until a new CSV is loaded).")
@@ -202,9 +200,9 @@ with st.sidebar:
         if st.button("🔄 Restart"):
             st.session_state["idx"] = 0
 
-# ----------------------
+
 # Main display
-# ----------------------
+
 idx = st.session_state["idx"]
 
 if idx >= total_assigned:
@@ -232,9 +230,8 @@ else:
 st.markdown("---")
 st.markdown("### Annotate Now")
 
-# ----------------------
 # Form submission
-# ----------------------
+
 with st.form("annotation_form", clear_on_submit=True):
     bias_score = st.slider("Bias Score (1 = No bias, 5 = Strong bias)", 1, 5, 3)
     notes = st.text_area("Notes (optional)", "")
@@ -252,9 +249,8 @@ if submitted:
             st.session_state["idx"] = min(total_assigned - 1, st.session_state["idx"] + 1)
             st.rerun()
 
-# ----------------------
 # Recent annotations
-# ----------------------
+
 st.markdown("---")
 st.markdown("### 🕒 Recent Annotations")
 
