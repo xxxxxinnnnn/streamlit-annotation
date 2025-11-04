@@ -4,11 +4,10 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 import random
-import hashlib
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
-st.title("📝 YesMaxx Annotation Workspace")
-st.caption("Automatically assigns 20 random records per annotator per CSV file (persistent until new upload).")
+st.title("YesMaxx Annotation Workspace")
+st.caption("Fully randomized annotation with non-repeating assignment.")
 
 # ----------------------
 # Paths & Data Loading
@@ -17,14 +16,12 @@ DATA_PATH = Path("selector_decisions_main2_3.csv")
 DB_PATH = Path("annotations.db")
 
 if not DATA_PATH.exists():
-    st.error("❌ selector_decisions_main2_3.csv not found in this directory.")
+    st.error("❌ selector_decisions.csv not found in this directory.")
     st.stop()
 
-# Load CSV
 responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
 responses_df.columns = [c.strip() for c in responses_df.columns]
 
-# Ensure columns
 if "response_id" not in responses_df.columns:
     responses_df.insert(0, "response_id", range(1, len(responses_df) + 1))
 
@@ -36,7 +33,7 @@ for c in responses_df.columns:
 if run_col and run_col != "run_id":
     responses_df.rename(columns={run_col: "run_id"}, inplace=True)
 elif not run_col:
-    responses_df.insert(1, "run_id", "run_auto")
+    responses_df.insert(1, "run_id", "run_003")
 
 if "response_text" not in responses_df.columns:
     text_col = None
@@ -86,6 +83,18 @@ def export_annotations():
         "text/csv",
         use_container_width=True,
     )
+
+def clean_old_annotations():
+    df_csv = pd.read_csv("selector_decisions.csv", encoding="utf-8")
+    valid_ids = set(df_csv["response_id"].astype(str))
+    rows = cur.execute("SELECT DISTINCT response_id FROM annotations").fetchall()
+    old_ids = [r[0] for r in rows if r[0] not in valid_ids]
+    if old_ids:
+        cur.executemany("DELETE FROM annotations WHERE response_id = ?", [(oid,) for oid in old_ids])
+        conn.commit()
+        st.warning(f"🧹 Deleted {len(old_ids)} old annotations not in the current CSV.")
+    else:
+        st.info("✅ No outdated annotations found.")
 
 def get_annotated_ids(annotator_filter=None):
     if annotator_filter:
@@ -148,33 +157,22 @@ with st.sidebar:
         st.stop()
 
     # ----------------------
-    # ✅ 自动分配逻辑（固定到 CSV 变化为止）
+    # ✅ 自动随机分配逻辑（每人 20 条）
     # ----------------------
     total = len(responses_df)
-    per_person = 20
     all_ids = list(range(1, total + 1))
+    random.shuffle(all_ids)
 
-    # 用 CSV 文件名 + 大小计算唯一签名
-    file_signature = hashlib.md5(f"{DATA_PATH.name}_{DATA_PATH.stat().st_size}".encode()).hexdigest()
+    assignments_round4 = {}
+    start = 0
+    for name in annotators:
+        end = start + 20
+        assignments_round4[name] = all_ids[start:end]
+        start = end
 
-    if "last_signature" not in st.session_state or st.session_state["last_signature"] != file_signature:
-        # 新文件 -> 重新随机分配
-        random.shuffle(all_ids)
-        assignments_auto = {}
-        start = 0
-        for i, name in enumerate(annotators):
-            end = start + per_person
-            assignments_auto[name] = all_ids[start:end]
-            start = end
-        st.session_state["assignments_auto"] = assignments_auto
-        st.session_state["last_signature"] = file_signature
-    else:
-        # 同一个文件 -> 读取上次的分配
-        assignments_auto = st.session_state["assignments_auto"]
-
-    assigned_ids = assignments_auto[annotator]
+    assigned_ids = assignments_round4[annotator]
     total_assigned = len(assigned_ids)
-    st.info(f"🧮 {annotator} has been assigned {total_assigned} fixed items (persistent until new CSV is loaded).")
+    st.info(f"🧮 You are assigned {total_assigned} random items (non-contiguous).")
 
     if "idx" not in st.session_state:
         st.session_state["idx"] = 0
@@ -269,4 +267,4 @@ if annotator:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
-st.caption("Tip: Assignment remains fixed until you load a new CSV file.")
+st.caption("Tip: Each annotator automatically gets 20 random samples per round.")
