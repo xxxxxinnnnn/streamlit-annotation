@@ -4,36 +4,27 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 import random
+import hashlib
 
 st.set_page_config(page_title="YesMaxx Annotation Workspace", layout="wide")
-st.title("📝 YesMaxx Annotation Workspace (Auto Assignment)")
-st.caption("Automatically assigns 20 random records per annotator whenever a new CSV is uploaded.")
+st.title("📝 YesMaxx Annotation Workspace")
+st.caption("Automatically assigns 20 random records per annotator per CSV file (persistent until new upload).")
 
 # ----------------------
-# File Upload or Path
+# Paths & Data Loading
 # ----------------------
-st.sidebar.header("📂 Upload Dataset")
-uploaded_file = st.sidebar.file_uploader("Upload a selector_decisions CSV file", type=["csv"])
-
-if uploaded_file is not None:
-    DATA_PATH = Path("uploaded_data.csv")
-    with open(DATA_PATH, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-else:
-    DATA_PATH = Path("selector_decisions.csv")
-
+DATA_PATH = Path("selector_decisions_main2_3.csv")
 DB_PATH = Path("annotations.db")
 
 if not DATA_PATH.exists():
-    st.error("❌ No CSV file found. Please upload one.")
+    st.error("❌ selector_decisions_main2_3.csv not found in this directory.")
     st.stop()
 
-# ----------------------
 # Load CSV
-# ----------------------
 responses_df = pd.read_csv(DATA_PATH, encoding="utf-8", on_bad_lines="skip", engine="python")
 responses_df.columns = [c.strip() for c in responses_df.columns]
 
+# Ensure columns
 if "response_id" not in responses_df.columns:
     responses_df.insert(0, "response_id", range(1, len(responses_df) + 1))
 
@@ -157,28 +148,33 @@ with st.sidebar:
         st.stop()
 
     # ----------------------
-    # ✅ Auto-random assignment
+    # ✅ 自动分配逻辑（固定到 CSV 变化为止）
     # ----------------------
     total = len(responses_df)
-    n_annotators = len(annotators)
-    per_person = total // n_annotators
-
+    per_person = 20
     all_ids = list(range(1, total + 1))
-    random.shuffle(all_ids)
 
-    assignments_auto = {}
-    start = 0
-    for i, name in enumerate(annotators):
-        end = start + per_person
-        if i == n_annotators - 1:
-            assignments_auto[name] = all_ids[start:]
-        else:
+    # 用 CSV 文件名 + 大小计算唯一签名
+    file_signature = hashlib.md5(f"{DATA_PATH.name}_{DATA_PATH.stat().st_size}".encode()).hexdigest()
+
+    if "last_signature" not in st.session_state or st.session_state["last_signature"] != file_signature:
+        # 新文件 -> 重新随机分配
+        random.shuffle(all_ids)
+        assignments_auto = {}
+        start = 0
+        for i, name in enumerate(annotators):
+            end = start + per_person
             assignments_auto[name] = all_ids[start:end]
-        start = end
+            start = end
+        st.session_state["assignments_auto"] = assignments_auto
+        st.session_state["last_signature"] = file_signature
+    else:
+        # 同一个文件 -> 读取上次的分配
+        assignments_auto = st.session_state["assignments_auto"]
 
     assigned_ids = assignments_auto[annotator]
     total_assigned = len(assigned_ids)
-    st.info(f"🧮 Auto-assigned {total_assigned} random items to {annotator} (total {total}).")
+    st.info(f"🧮 {annotator} has been assigned {total_assigned} fixed items (persistent until new CSV is loaded).")
 
     if "idx" not in st.session_state:
         st.session_state["idx"] = 0
@@ -273,4 +269,4 @@ if annotator:
         ann_df = ann_df[ann_df["annotator"] == annotator]
 
 st.dataframe(ann_df, use_container_width=True, hide_index=True)
-st.caption("Tip: Each annotator automatically receives 20 random items per dataset upload.")
+st.caption("Tip: Assignment remains fixed until you load a new CSV file.")
